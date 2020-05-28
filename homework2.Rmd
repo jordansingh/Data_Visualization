@@ -1,0 +1,259 @@
+---
+title: 'Homework #2'
+author: "Jordan Singh"
+date: "3/22/2020"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(readr)
+library(RColorBrewer)
+building_fires_original <- read_csv("building_fires.csv")
+firehouses <- read_csv("FDNY_Firehouse_Listing.csv") %>%
+  dplyr::filter(!is.na(Latitude))
+```
+
+1. Location of Severe Fires
+
+Provide a leaflet map of the highest severity fires (i.e. subset to the highest category in HIGHEST_LEVEL_DESC) contained in the file buiding_fires.csv. Ignore locations that fall outside the five boroughs of New York City. Provide at least three pieces of information on the incident in a popup.
+
+```{r}
+library(leaflet)
+
+#need to subset to fires of highest severity
+building_fires <- building_fires_original %>%
+  filter(HIGHEST_LEVEL_DESC == "7 - Signal 7-5")
+
+variables <- paste("Date:", building_fires$INCIDENT_DATE_TIME, "<br/>",
+                   "Incident Duration in seconds:", building_fires$TOTAL_INCIDENT_DURATION, "<br/>",
+                   "Primary Action:", building_fires$ACTION_TAKEN1_DESC, "<br/>")
+
+fire_map <- leaflet(building_fires) %>%
+  addTiles() %>% 
+  addCircles(lng = ~lon,
+             lat = ~lat,
+             color = "blue",
+             popup = variables)
+  
+  
+fire_map
+```
+
+2. Layers and Clusters
+
+
+a) Color by Type of Property
+
+Start with the previous map. Now, distinguish the markers of the fire locations by PROPERTY_USE_DESC, i.e. what kind of property was affected. If there are too many categories, collapse some categories. Choose an appropriate coloring scheme to map the locations by type of affected property. Add a legend informing the user about the color scheme. Also make sure that the information about the type of affected property is now contained in the popup information. Show this map.
+
+```{r}
+#subsetting to locations that have more than 15 occurances and grouping into 5 categories
+
+
+building_fires$PROPERTY_USE_DESC[building_fires$PROPERTY_USE_DESC == "000 - Property Use, other"] <- "Other"
+building_fires$PROPERTY_USE_DESC[building_fires$PROPERTY_USE_DESC == "131 - Church, mosque, synagogue, temple, chapel"] <- "Other"
+building_fires$PROPERTY_USE_DESC[building_fires$PROPERTY_USE_DESC == "700 - Manufacturing, processing"] <- "Other"
+building_fires$PROPERTY_USE_DESC[building_fires$PROPERTY_USE_DESC == "800 - Storage, other"] <- "Other"
+building_fires$PROPERTY_USE_DESC[building_fires$PROPERTY_USE_DESC == "881 - Parking garage, (detached residential garage)"] <- "Other"
+building_fires$PROPERTY_USE_DESC[building_fires$PROPERTY_USE_DESC == "891 - Warehouse"] <- "Other"
+
+
+building_fires$PROPERTY_USE_DESC[building_fires$PROPERTY_USE_DESC == "400 - Residential, other"] <- "Housing"
+building_fires$PROPERTY_USE_DESC[building_fires$PROPERTY_USE_DESC == "419 - 1 or 2 family dwelling"] <- "Housing"
+building_fires$PROPERTY_USE_DESC[building_fires$PROPERTY_USE_DESC == "429 - Multifamily dwelling"] <- "Housing"
+building_fires$PROPERTY_USE_DESC[building_fires$PROPERTY_USE_DESC == "439 - Boarding/rooming house, residential hotels"] <- "Housing"
+building_fires$PROPERTY_USE_DESC[building_fires$PROPERTY_USE_DESC == "449 - Hotel/motel, commercial"] <- "Housing"
+
+building_fires$PROPERTY_USE_DESC[building_fires$PROPERTY_USE_DESC == "160 - Eating, drinking places, other"] <- "Food"
+building_fires$PROPERTY_USE_DESC[building_fires$PROPERTY_USE_DESC == "161 - Restaurant or cafeteria"] <- "Food"
+building_fires$PROPERTY_USE_DESC[building_fires$PROPERTY_USE_DESC == "162 - Bar or nightclub"] <- "Food"
+building_fires$PROPERTY_USE_DESC[building_fires$PROPERTY_USE_DESC == "519 - Food and beverage sales, grocery store"] <- "Food"
+
+building_fires$PROPERTY_USE_DESC[building_fires$PROPERTY_USE_DESC == "210 - Schools, non-adult, other"] <- "Education"
+
+building_fires$PROPERTY_USE_DESC[building_fires$PROPERTY_USE_DESC == "311 - 24-hour care Nursing homes, 4 or more persons"] <- "Medical"
+building_fires$PROPERTY_USE_DESC[building_fires$PROPERTY_USE_DESC == "331 - Hospital - medical or psychiatric"] <- "Medical"
+
+building_fires$PROPERTY_USE_DESC[building_fires$PROPERTY_USE_DESC == "500 - Mercantile, business, other"] <- "Business"
+building_fires$PROPERTY_USE_DESC[building_fires$PROPERTY_USE_DESC == "549 - Specialty shop"] <- "Business"
+building_fires$PROPERTY_USE_DESC[building_fires$PROPERTY_USE_DESC == "564 - Laundry, dry cleaning"] <- "Business"
+building_fires$PROPERTY_USE_DESC[building_fires$PROPERTY_USE_DESC == "579 - Motor vehicle or boat sales, services, repair"] <- "Business"
+building_fires$PROPERTY_USE_DESC[building_fires$PROPERTY_USE_DESC == "599 - Business office"] <- "Business"
+
+building_fires_condensed <- building_fires %>%
+  filter(PROPERTY_USE_DESC == "Other" | 
+           PROPERTY_USE_DESC =="Housing" | 
+           PROPERTY_USE_DESC =="Food" | 
+           PROPERTY_USE_DESC =="Medical" | 
+           PROPERTY_USE_DESC =="Business")
+
+
+pal = colorFactor("Set1", domain = building_fires_condensed$PROPERTY_USE_DESC) # Grab a palette
+color_pal = pal(building_fires_condensed$PROPERTY_USE_DESC)
+
+variables1 <- paste("Date:", building_fires$INCIDENT_DATE_TIME, "<br/>",
+                   "Incident Duration in seconds:", building_fires$TOTAL_INCIDENT_DURATION, "<br/>",
+                   "Primary Action:", building_fires$ACTION_TAKEN1_DESC, "<br/>",
+                   "Property Type:", building_fires_condensed$PROPERTY_USE_DESC, "<br/>")
+
+fire_map_color <- leaflet(building_fires_condensed) %>%
+  addTiles() %>% 
+  addCircles(lng = ~lon,
+             lat = ~lat,
+             color = color_pal,
+             popup = variables1) %>%
+  addLegend(pal = pal, values = ~building_fires_condensed$PROPERTY_USE_DESC, title = "Property Types")
+
+fire_map_color
+```
+
+b) Cluster
+
+Add marker clustering, so that zooming in will reveal the individual locations but the zoomed out map only shows the clusters. Show the map with clusters.
+
+```{r}
+fire_map_cluster <- fire_map_color %>%
+  addCircleMarkers(clusterOptions = markerClusterOptions())
+
+fire_map_cluster
+```
+
+
+
+3. Fire Houses
+
+The second data file contains the locations of the 218 firehouses in New York City. Start with the non-clustered map (2b) and now adjust the size of the circle markers by severity (TOTAL_INCIDENT_DURATION or UNITS_ONSCENE seem plausible options). More severe incidents should have larger circles on the map. On the map, also add the locations of the fire houses. Add two layers (“Incidents”, “Firehouses”) that allow the user to select which information to show.
+
+```{r}
+firehouses_map <- leaflet(building_fires) %>%
+  addTiles() %>%
+  addCircles(radius = building_fires$TOTAL_INCIDENT_DURATION/100) 
+
+firehouses_map
+
+firehouses_map2 <- leaflet() %>%
+  addTiles() %>%
+  addCircles(data = building_fires, 
+             radius = building_fires$TOTAL_INCIDENT_DURATION/100,
+             group = "Incidents") %>%
+  addCircles(data = firehouses,
+             group = "Firehouses",
+             color = "red") %>%
+  addLayersControl(
+    baseGroups = c("Incidents",
+                   "Firehouses"),
+    position = "topright",
+    options = layersControlOptions(collapsed = FALSE))
+
+firehouses_map2
+```
+
+
+
+
+
+4. Distance from Firehouse and Response Time
+
+We now want to investigate whether the distance of the incident from the nearest firehouse varies across the city.
+
+a) Calculate Distance
+
+For all incident locations (independent of severity), identify the nearest firehouse and calculate the distance between the firehouse and the incident location. Provide a scatter plot showing the time until the first engine arrived (the variables INCIDENT_DATE_TIME and ARRIVAL_DATE_TIME) will be helpful.
+
+Now also visualize the patterns separately for severe and non-severe incidents (use HIGHEST_LEVEL_DESC but feel free to reduce the number of categories). What do you find?
+
+```{r, error = TRUE}
+library(geosphere)
+library(rgeos)
+
+
+distance <- distm(firehouses, building_fires_original, fun = distGeo)
+```
+
+
+b) Map of Response Times
+
+Provide a map visualization of response times. Investigate whether the type of property affected (PROPERTY_USE_DESC) or fire severity (HIGHEST_LEVEL_DESC) play a role here.
+
+Show a faceted choropleth map indicating how response times have developed over the years. What do you find?
+
+```{r, error = TRUE}
+library(rgdal)
+library(difftime)
+borough_boundaries <- readOGR("borough_boundaries.geojson")
+
+#get year var
+building_fires_condensed$year <- substring(building_fires_condensed$INCIDENT_DATE_TIME, 7, 10)
+
+fires2013 <- building_fires_condensed %>%
+  filter(year == 2013)
+fires2014 <- building_fires_condensed %>%
+  filter(year == 2014)
+fires2015 <- building_fires_condensed %>%
+  filter(year == 2015)
+fires2016 <- building_fires_condensed %>%
+  filter(year == 2016)
+fires2017 <- building_fires_condensed %>%
+  filter(year == 2017)
+fires2018 <- building_fires_condensed %>%
+  filter(year == 2018)
+
+
+map_final <- leaflet() %>%
+  addTiles() %>% 
+  addCircles(data = fires2013,
+             lng = ~lon,
+             lat = ~lat,
+             color = color_pal,
+             popup = variables1,
+             radius = fires2013$TOTAL_INCIDENT_DURATION/100,
+             group = "2013") %>%
+  addCircles(data = fires2014,
+             lng = ~lon,
+             lat = ~lat,
+             color = color_pal,
+             popup = variables1,
+             radius = fires2014$TOTAL_INCIDENT_DURATION/100,
+             group = "2014") %>%
+  addCircles(data = fires2015,
+             lng = ~lon,
+             lat = ~lat,
+             color = color_pal,
+             popup = variables1,
+             radius = fires2015$TOTAL_INCIDENT_DURATION/100,
+             group = "2015") %>%
+  addCircles(data = fires2016,
+             lng = ~lon,
+             lat = ~lat,
+             color = color_pal,
+             popup = variables1,
+             radius = fires2016$TOTAL_INCIDENT_DURATION/100,
+             group = "2016") %>%
+  addCircles(data = fires2017,
+             lng = ~lon,
+             lat = ~lat,
+             color = color_pal,
+             popup = variables1,
+             radius = fires2017$TOTAL_INCIDENT_DURATION/100,
+             group = "2017") %>%
+  addCircles(data = fires2018,
+             lng = ~lon,
+             lat = ~lat,
+             color = color_pal,
+             popup = variables1,
+             radius = fires2018$TOTAL_INCIDENT_DURATION/100,
+             group = "2018") %>%
+  addLayersControl(
+    baseGroups = c("2013",
+                   "2014",
+                   "2015",
+                   "2016",
+                   "2017",
+                   "2018"),
+    position = "topleft",
+    options = layersControlOptions(collapsed = FALSE))
+  
+
+map_final
+```

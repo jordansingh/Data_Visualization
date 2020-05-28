@@ -1,0 +1,197 @@
+---
+title: 'Homework #1'
+author: "Jordan Singh"
+date: "2/22/2020"
+output: html_document
+---
+
+## 1. Debt Over Time
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+require(scales)
+library(plotly)
+library(expss)
+
+survey <- read.csv("survey_SCF.txt", header = TRUE)
+
+survey$HHSEX[survey$HHSEX == 2] <- "Female"
+survey$HHSEX[survey$HHSEX == 1] <- "Male"
+
+ggplot(survey, mapping = aes(x = YEAR, y = EDN_INST, fill = as.factor(HHSEX))) +
+  geom_col(position = "dodge") +
+  scale_y_continuous(labels = dollar) +
+  xlab("Year") + 
+  ylab("Education Loans") +
+  guides(fill = guide_legend(title="Household Sex")) +
+  theme_minimal()
+
+ggplot(survey, mapping = aes(x = YEAR, y = NH_MORT, fill = as.factor(HHSEX))) +
+  geom_col(position = "dodge") +
+  scale_y_continuous(labels = dollar) +
+  xlab("Year") + 
+  ylab("Mortgage and Home Equity Loans") +
+  guides(fill = guide_legend(title="Household Sex")) +
+  theme_minimal()
+```
+
+For the first part of this question, I wanted to explore a few variables, namely comparing education loans to mortgage loans as well as seeing how they differ across sex.  With that, the cost of overall education loans was significantly less than that of mortgages.  Along with that, as time goes on, the share of education loans between the head of households seems to be more evely split between men and women.  This compares to home mortgages, who have generall much higher proportions of mortgage loans with male heads of households.  There was a periodic increase in the share with females but this was dwarfed the following survey year with a decrease for females and a large increase for males.  
+
+```{r}
+surveyedn <- filter(survey, EDN_INST > 0)
+#created a new survey for just those with education loan values, then added a new variable of the ratio of student loans to household income
+#create new student loan to debt ratio
+surveyedn$edratio <- surveyedn$EDN_INST / surveyedn$INCOME
+
+#new df with just the education debt ratio less than or equal to 1
+surveyeddebt2 <- filter(surveyedn, edratio <= 1)
+
+#box and whisker plot for ratios between 0 and 1
+ggplot(surveyeddebt2) +
+  geom_boxplot(mapping = aes(group = YEAR, y = edratio)) +
+  theme_minimal() +
+  xlab("Year") +
+  ylab("Education Loan to Income Ratio")
+
+```
+
+For the second comaprison, I wanted to compare the ratio of education loan debt to household income in 2016 dollars.  To do this, I created a new dataframe with only those who had a value for education loans.  Following this, I added a new variable that took the total education debt, and divided it by household income.  There were a number of outliers, but I wanted to focus on those whose ratios were between 0-1.  For this, I made a box and whiskers plot to see the distribution of education debt to income.
+
+As the plot shows, the difference between the 1st and 3rd quartile increases over time, as does the median ratio value.  On top of this, there is an increase over time for the upper end of education to income ratios.
+
+
+## 2. Tell me who you are
+
+```{r}
+require(scales)
+survey16 <- filter(survey, YEAR == 2016)
+
+ggplot(survey16, mapping = aes(x = as.factor(EDUC), y = EDN_INST, fill = as.factor(HHSEX))) +
+  geom_col(position = "dodge") +
+  scale_y_continuous(labels = dollar) +
+  xlab("Education") + 
+  ylab("Education Loans") +
+  guides(fill=guide_legend(title="Household Sex")) +
+  theme_minimal()
+
+survey16$RACE[survey16$RACE == 1] <- "White non-Hispanic"
+survey16$RACE[survey16$RACE == 2] <- "Black/African American"
+survey16$RACE[survey16$RACE == 3] <- "Hispanic"
+survey16$RACE[survey16$RACE == 5] <- "Other"
+
+ggplot(survey16, mapping = aes(x = AGE, y = EDN_INST, colour = as.factor(RACE))) +
+  geom_point() +
+  scale_y_continuous(labels = dollar) +
+  xlab("Age") + 
+  ylab("Education Loans") +
+  ylim(0, 200000) +
+  theme_minimal()
+```
+
+First, I needed to filter the survey data to only include those responses from 2016.  Following this, I first wanted to observe the difference in education to education debt split across the different sex of the head of households.  With this, it seems like as time goes on, female led households have a higher percentage of student loan debt.  And with this, that as to be expected, debt increases as the type of education goes up.  8 in this case is for high school graduates or equivalent.
+
+In the second plot, I chose to measure loan debt across race and and Age.  I plotted the age on the x axis to see the frequency of debt as people get older, and chose to make the color of points fit the four race categories of race measured.  With this we can see that the majority of student loan debt for 2016 was held by those who are white non-hispanic, and that general loan values decreased over time.
+
+
+## 3. Wealth and Income Distribution
+
+```{r}
+#record income percentiles
+survey16$INCCAT[survey16$INCCAT == 1] <- "0-20"
+survey16$INCCAT[survey16$INCCAT == 2] <- "20-39.9"
+survey16$INCCAT[survey16$INCCAT == 3] <- "40-59.9"
+survey16$INCCAT[survey16$INCCAT == 4] <- "60-79.9"
+survey16$INCCAT[survey16$INCCAT == 5] <- "80-89.9"
+survey16$INCCAT[survey16$INCCAT == 6] <- "90-100"
+
+ggplot(survey16, mapping = aes(x = as.factor(EDUC), y = EDN_INST, fill = as.factor(INCCAT))) +
+  geom_col(position = "dodge") +
+  scale_y_continuous(labels = dollar) +
+  xlab("Education") + 
+  ylab("Education Loans") +
+  guides(fill=guide_legend(title="Income percentile")) +
+  ylim(0, 200000) +
+  theme_minimal()
+```
+
+For this plot I wanted to recode the income percentile to show the original groupings to make the graph easier to read.  Following this, I chose to use a bar chart to help visualize across different education and income percentiles, what the distribution of debt looked like. Interestingly, there was a large share of debt who had a head of household member only make it to the 7th or 8th grade.  I think some of the debt for the lower education ranks may be the debt of their current children attending school.
+
+## 4. Going broke
+
+```{r}
+#recode to include only those who've declared bankruptcy within last 5 years
+surveyb <- filter(survey, BNKRUPLAST5 == 1)
+surveyf <- filter(survey, FORECLLAST5 == 1)
+```
+According to this recode, there are 5,746 respondents who said that they've declared bankruptcy in the last 5 years, and 606 who've had a foreclosure in the same time period.
+
+```{r}
+ggplot(surveyb, mapping = aes(x = YEAR, y = EDN_INST)) +
+  geom_col() +
+  scale_y_continuous(labels = dollar) +
+  xlab("Year") + 
+  ylab("Education Loans") +
+  theme_minimal() 
+
+ggplot(surveyf, mapping = aes(x = FOODHOME, y = EDN_INST)) +
+  geom_point() +
+  scale_y_continuous(labels = dollar) +
+  scale_x_continuous(labels = dollar) +
+  xlab("Money Spent on Food at Home") + 
+  ylab("Education Loans") +
+  geom_smooth(method = "lm") +
+  ylim(0, 50000) +
+  xlim(0, 20000) +
+  theme_minimal() 
+
+```
+
+For this plot, I decided to look at bankruptcy over time, and foreclosure with respect to money spent buying food for home, all in relation to studnet loans.  In the first bar chart, for those who did say across any of the survey years that they declared bankruptcy, the amount that had due in education loans has increased greatly over time.  This might be due to the high cost of education, and the lack of success in finding a job after graduating.
+
+In the second plot, I wanted to see the trend in education loans for those who've had a recent foreclosure.  With this plot, I decided to add in a linear regression line to see if there was any relationship.  I set the scales to 50,000 for student loans and 20,000 for money spend on food.  With the linear regression, it seems as if there was a slight decrease over education loans for those who spent more on food.  Perhaps implying that fewer student loans frees up more money to spend on food to cook at home. 
+
+## 5. Making two plots interactive
+
+```{r}
+a <- ggplot(survey16, mapping = aes(x = AGE, y = EDN_INST, colour = as.factor(RACE))) +
+  geom_point() +
+  scale_y_continuous(labels = dollar) +
+  xlab("Age") + 
+  ylab("Education Loans") +
+  ylim(0, 200000) +
+  theme_minimal()
+
+ggplotly(a)
+
+b <- ggplot(survey16, mapping = aes(x = as.factor(EDUC), y = EDN_INST, fill = as.factor(INCCAT))) +
+  geom_col(position = "dodge") +
+  scale_y_continuous(labels = dollar) +
+  xlab("Education") + 
+  ylab("Education Loans") +
+  guides(fill=guide_legend(title="Income percentile")) +
+  ylim(0, 200000) +
+  theme_minimal()
+
+ggplotly(b)
+#some debt of those with less than college perhaps from kids currently going to school
+```
+
+I chose two previous plots that I felt had a lot of elements to measure, and might make for a good example of showing visualization.  In the first plot, there were so many different individual points that I felt the interactive elemtn would help parse out different races.
+
+In the second, I felt it might be useful for the reader to select or deselect different income percentiles to see how the different income percentiles measure individually, or comparatively.
+
+## 6. Data Table
+
+```{r}
+survey = apply_labels(survey,
+                      EDUC = "Head of Household Education",
+                      YEAR = "Survey Year")
+
+cro(survey$YEAR, survey$EDUC)
+```
+
+For the data table, I wanted to keep it simple.  So I chose to make a table of survey year with the count of education for the heads of household.  It was interesting to see that for a stretch in the 1990s - 00s, there weren't any people who said they had less than a 1st grade education.  Only to see a count return in 2007 and increase slightly by 2016.
+
+I think this table shows that education, especially at higher levels has increase over time.  For the highest category, 14 or doctorate or professional school, the count of respondents increased from 1,426 to 2,289.  Or for those with a bachelor's degree at 12 increasing from 3,018 to 7,429.  Which seems to suggest that people are becoming more educated over time, as the head of household is generally assumed to be the most educated in a house.
